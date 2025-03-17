@@ -1,193 +1,141 @@
+# Docker Volumes: Persistent Data Storage 
 
-# Full Stack App Using Docker
+## Introduction
+Docker Volumes are essential for maintaining persistent data storage in containerized environments. By default, container data is ephemeral, meaning it gets erased when the container stops or is removed. Docker Volumes solve this issue by providing a persistent file system that remains intact even after the container is deleted.
 
-* Create a Docker network (bridge mode) to connect the two containers.
-* Create a Docker container for the database (e.g., PostgreSQL or MySQL).
-* Create a Docker container for the Streamlit app and connect it to the database using the network.
+In this guide, we will explore how to create, manage, and effectively use Docker Volumes on Windows. By the end, you will understand how to ensure data persistence within your containerized applications. 🚀
 
+---
+## Why Use Docker Volumes?
+Docker Volumes are useful for:
+- **Preserving Database Files**: Ensuring that database records persist beyond the container’s lifecycle.
+- **Sharing Data Across Containers**: Allowing multiple containers to access a common set of files.
+- **Backing Up and Restoring Data**: Simplifying the data management process.
 
+For more details, refer to:
+- [Docker Documentation](https://docs.docker.com)
+- [Docker Volume Documentation](https://docs.docker.com/storage/volumes/)
 
+---
+## Prerequisites
+Ensure you have the following installed on your Windows system:
+- **Docker Desktop**: The tool required to manage Docker containers.
+- **Windows PowerShell or Command Prompt**: To execute Docker commands.
 
-## Documentation
-
-[Docker](https://docs.docker.com/)
-
-[My SQL](https://hub.docker.com/_/mysql)
-
-[Docker Network](https://docs.docker.com/engine/network/)
-
-
-
-
-
-## Deployment
-
-1. Create The network
-```bash
-docker network create my_network
-```
-2. Set Up the Database Container
-
-```bash
-docker run -d \
-  --name my_postgres \
-  --network my_network \
-  -e POSTGRES_USER=admin \
-  -e POSTGRES_PASSWORD=adminpassword \
-  -e POSTGRES_DB=mydb \
-  postgres
+### Verify Docker Installation
+Check if Docker is installed by running the following command in PowerShell or Command Prompt:
+```sh
+docker --version
 ```
 
-This will create a PostgreSQL container named my_postgres connected to my_network
+### Verify Python Installation (Optional)
+Check if Python is installed:
+```sh
+python --version
+```
+---
+## Step 1: Create and Manage Docker Volumes
+### 1.1 Create a Docker Volume
+```sh
+docker volume create mydata
+```
+This creates a volume named `mydata`.
 
-3. Create the Streamlit App Container
-
-
-In your Streamlit project folder, create a Dockerfile:
-
-```bash
-# Use the official Streamlit image
-FROM python:3.9
-
-# Set the working directory
-WORKDIR /app
-
-# Copy the app files
-COPY . .
-
-# Install dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Run Streamlit
-CMD ["streamlit", "run", "stream.py", "--server.port=8501", "--server.address=0.0.0.0"]
-
+### 1.2 List All Volumes
+```sh
+docker volume ls
+```
+Expected output:
+```sh
+DRIVER    VOLUME NAME
+local     mydata
 ```
 
-Ensure that requirements.txt includes streamlit and psycopg2 (for PostgreSQL):
-
-```bash
-streamlit
-psycopg2
+### 1.3 Inspect a Volume
+```sh
+docker volume inspect mydata
 ```
+This displays detailed information about the volume, such as its mount location and creation date.
 
-4. Build and Run the Streamlit Container
-
-Build the image:
-
-```bash
-docker build -t my_streamlit_app .
+---
+## Step 2: Attach Volumes to Containers
+### 2.1 Attach a Volume to a Node.js Container
+```sh
+docker run -it -v mydata:/appdata node cmd
 ```
+- `-v mydata:/appdata`: Mounts the `mydata` volume to the `/appdata` directory inside the container.
+- `node`: Uses the official Node.js image.
+- `cmd`: Opens the Command Prompt inside the container.
 
-Run the container and connect it to my_network:
-
-```bash
-docker run -d \
-  --name streamlit_app \
-  --network my_network \
-  -p 8501:8501 \
-  my_streamlit_app
-
-```
-
-5. Connect the Streamlit App to PostgreSQL
-
-Now we will create stream.py
-
-```bash
-import streamlit as st
-import psycopg2
-
-# Database connection
-conn = psycopg2.connect(
-    dbname="mydb",
-    user="admin",
-    password="adminpassword",
-    host="my_postgres",  # Container name as hostname
-    port="5432"
+![Image 1](![Screenshot (52)](https://github.com/user-attachments/assets/4efb46d9-644b-4202-8c17-318702713cb7)
 )
-cur = conn.cursor()
+### 2.2 Attach a Volume to an Ubuntu Container
+```sh
+docker run -it -v mydata:/data ubuntu bash
+```
+- `-v mydata:/data`: Mounts the `mydata` volume to `/data` in the container.
+- `ubuntu`: Uses the Ubuntu image.
+- `bash`: Opens an interactive Bash shell.
 
-# Example query
-cur.execute("SELECT version();")
-db_version = cur.fetchone()
-
-st.title("Streamlit App with PostgreSQL")
-st.write("Connected to database:", db_version)
-
-cur.close()
-conn.close()
-
+---
+## Step 3: Data Persistence with Docker Volumes
+### 3.1 Create a File Inside a Volume
+```sh
+docker run -it -v mydata:/appdata node cmd
+cd /appdata
+echo "Hello, Docker Volumes!" > example.txt
 ```
 
-6. Test the Setup
-
-```bash
-http://localhost:8501
+### 3.2 Verify Data Persistence
+Stop and remove the container:
+```sh
+exit
+docker container ls -a
+docker container rm <CONTAINER_ID>
 ```
 
-Now we will create the Custom Bridge network
-
-```bash
-docker network create --driver bridge my_custom_network
-
+Start a new container with the same volume and check the file:
+```sh
+docker run -it -v mydata:/appdata node cmd
+cd /appdata
+type example.txt
+```
+Expected output:
+```sh
+Hello, Docker Volumes!
 ```
 
-7. Insert Dummy Data
-
-* Connect to PostgreSQL Container
-To access the PostgreSQL database inside the container, run:
-
-```bash
-docker exec -it my_postgres psql -U admin -d mydb
-
+---
+## Step 4: Share Data Between Containers
+### 4.1 Start Two Containers with the Same Volume
+Start the first container:
+```sh
+docker run -it -v mydata:/shared-data node cmd
+```
+Start the second container:
+```sh
+docker run -it -v mydata:/shared-data ubuntu bash
 ```
 
-8. Create a Sample Table and Insert Data
-
-```bash
-
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100),
-    email VARCHAR(100) UNIQUE
-);
-
-INSERT INTO users (name, email) VALUES
-('Alice Johnson', 'alice@example.com'),
-('Bob Smith', 'bob@example.com'),
-('Charlie Brown', 'charlie@example.com');
-
-SELECT * FROM users;
-
+### 4.2 Verify Shared Data
+In the first container, create a file:
+```sh
+echo "Shared Content" > /shared-data/shared.txt
+```
+In the second container, verify the file:
+```sh
+cat /shared-data/shared.txt
+```
+Expected output:
+```sh
+Shared Content
 ```
 
-9. Create a Dockerfile for Streamlit
+---
+## Conclusion 🎉
+Congratulations! 🎉 You have successfully created and managed Docker Volumes on Windows. Now, you can persist data across container restarts and enable file sharing between containers, making your applications more reliable and scalable.
 
-```bash
+Keep experimenting with Docker Volumes to enhance your containerized applications! 🚀🐳
 
-# Use Python as base image
-FROM python:3.9
+Happy coding! 💻✨
 
-# Set working directory
-WORKDIR /app
-
-# Copy application files
-COPY . .
-
-# Install dependencies
-RUN pip install --no-cache-dir streamlit psycopg2
-
-# Expose Streamlit port
-EXPOSE 8501
-
-# Run Streamlit
-CMD ["streamlit", "run", "stream.py", "--server.port=8501", "--server.address=0.0.0.0"]
-
-```
-Now we will run this command to do this:
-
-```bash
-docker run --name streamlit_ap --network mybridge -p 8501:8501 streamlit_app
-```
-
-THANK YOU.
